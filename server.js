@@ -1,64 +1,64 @@
 const express = require("express");
-const { Client } = require("node-osc");
+const http = require("http");
+const { Server } = require("socket.io");
+const { Client, Server: OSCServer } = require("node-osc");
 const path = require("path");
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
+
 const port = 3000;
 
-// Konfigurasi OSC Client: Mengirim data ke IP PC ini (localhost) di port 8000
-// (Nanti di Unity, script OSC receiver-nya harus mendengarkan di port 8000)
 const oscClient = new Client("127.0.0.1", 8000);
+const oscServer = new OSCServer(8001, "127.0.0.1");
 
-// Setup EJS
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
+app.use(express.static("public"));
 
-// Middleware untuk membaca JSON dari request body
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Route utama untuk render halaman EJS
 app.get("/", (req, res) => {
   res.render("index");
 });
 
-// ==========================================
-// REST API ENDPOINTS (Tablet -> Node -> OSC)
-// ==========================================
+io.on("connection", (socket) => {
+  console.log("Tablet terhubung via WebSocket!");
 
-app.post("/api/start", (req, res) => {
-  oscClient.send("/ui/start", 1);
-  res.json({ status: "success", message: "Trigger Start Game" });
+  socket.on("startGame", () => oscClient.send("/ui/start", 1));
+  socket.on("selectMode", (mode) => oscClient.send("/ui/mode", mode));
+  socket.on("submitName", (data) =>
+    oscClient.send(`/ui/name/${data.player}`, data.name),
+  );
+
+  socket.on("gridClick", (index) => oscClient.send("/game/grid/click", index));
 });
 
-app.post("/api/mode", (req, res) => {
-  // Mode bisa boolean: 0 untuk 1P (Bot), 1 untuk 2P
-  const mode = req.body.mode;
-  oscClient.send("/ui/mode", mode);
-  res.json({ status: "success", message: `Trigger Mode: ${mode}` });
+oscServer.on("message", (msg) => {
+  const [address, ...args] = msg;
+
+  console.log(`[OSC IN] Address: ${address} | Args:`, args);
+
+  if (address === "/game/updateGrid") {
+    console.log(
+      `---> Mengirim ke Tablet: syncGrid (Index: ${args[0]}, Side: ${args[1]})`,
+    );
+    io.emit("syncGrid", { index: args[0], side: args[1] });
+  }
+
+  if (address === "/game/turn") {
+    console.log(`---> Mengirim ke Tablet: syncTurn (Player: ${args[0]})`);
+    io.emit("syncTurn", { playerName: args[0] });
+  }
+
+  if (address === "/game/over") {
+    console.log(`---> Mengirim ke Tablet: syncGameOver (Winner: ${args[0]})`);
+    io.emit("syncGameOver", { winner: args[0] });
+  }
 });
 
-app.post("/api/name", (req, res) => {
-  const { player, name } = req.body;
-  // Mengirim string nama ke address spesifik player
-  oscClient.send(`/ui/name/${player}`, name);
-  res.json({
-    status: "success",
-    message: `Name ${name} sent for Player ${player}`,
-  });
-});
-
-app.post("/api/leaderboard", (req, res) => {
-  oscClient.send("/ui/leaderboard", 1);
-  res.json({ status: "success", message: "Trigger Leaderboard" });
-});
-
-app.post("/api/ads", (req, res) => {
-  oscClient.send("/ui/ads", 1);
-  res.json({ status: "success", message: "Trigger Ads" });
-});
-
-app.listen(port, () => {
-  console.log(`Server web berjalan di http://localhost:${port}`);
-  console.log(`OSC Client siap mengirim ke Unity di port 8000`);
+server.listen(port, () => {
+  console.log(`Server web & WebSocket berjalan di http://localhost:${port}`);
+  console.log(
+    `OSC TX (ke Unity) di port 8000 | OSC RX (dari Unity) di port 8001`,
+  );
 });
