@@ -5,23 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Game Controller</title>
     <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <style>
       body {
         font-family: Arial, sans-serif;
         background-color: #222;
         color: #fff;
         text-align: center;
-        padding: 20px;
         margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        overflow: hidden;
       }
+
       .container {
+        width: 90%;
         max-width: 600px;
-        margin: auto;
         background: #333;
-        padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.7);
+        position: relative;
       }
+
       button {
         background-color: #4caf50;
         color: white;
@@ -31,66 +41,89 @@
         margin: 10px 0;
         cursor: pointer;
         width: 100%;
-        border-radius: 5px;
+        border-radius: 8px;
+        transition:
+          transform 0.1s,
+          background-color 0.2s;
       }
       button:active {
         background-color: #45a049;
+        transform: scale(0.98);
       }
 
       .btn-fullscreen {
-        background-color: #555;
-        margin-bottom: 20px;
+        position: fixed;
+        top: 15px;
+        right: 15px;
+        width: auto;
+        padding: 10px 15px;
+        background-color: rgba(85, 85, 85, 0.4);
+        font-size: 14px;
+        border-radius: 8px;
+        margin: 0;
+        z-index: 9999;
+        backdrop-filter: blur(5px);
       }
       .btn-fullscreen:active {
-        background-color: #444;
+        background-color: rgba(85, 85, 85, 0.8);
       }
 
       input {
-        width: calc(100% - 22px);
-        padding: 15px 10px;
-        margin: 10px 0;
+        width: calc(100% - 30px);
+        padding: 15px;
+        margin: 15px 0;
         font-size: 16px;
-        border-radius: 5px;
+        border-radius: 8px;
         border: none;
         text-align: center;
       }
+      input:focus {
+        outline: 2px solid #4caf50;
+      }
 
-      /* Class untuk mengatur halaman yang tampil */
       .panel {
         display: none;
       }
       .panel.active {
         display: block;
+        animation: fadeIn 0.3s ease-in-out;
       }
 
-      /* Grid style untuk TicTacToe */
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
       .grid-container {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 5px;
-        margin-top: 15px;
+        gap: 8px;
+        margin-top: 20px;
       }
       .grid-container button {
-        height: 80px;
-        font-size: 32px;
+        height: 100px;
+        font-size: 40px;
         font-weight: bold;
         margin: 0;
         background-color: #555;
+        border-radius: 12px;
       }
     </style>
   </head>
   <body>
+    <button class="btn-fullscreen" onclick="toggleFullScreen()">⛶</button>
     <div class="container">
-      <button class="btn-fullscreen" onclick="toggleFullScreen()">
-        ⛶ Toggle Fullscreen
-      </button>
       <h2>Game Controller</h2>
-      <hr />
-
+      <hr style="border: 1px solid #555; margin-bottom: 20px" />
       <div id="panel-start" class="panel active">
         <button onclick="onStartGame()">▶ Start Game</button>
       </div>
-
       <div id="panel-mode" class="panel">
         <h3>Pilih Mode Bermain</h3>
         <button onclick="onSelectMode(0)" style="background-color: #2196f3">
@@ -100,112 +133,101 @@
           👥 2 Players
         </button>
       </div>
-
       <div id="panel-name" class="panel">
         <h3 id="nameTitle">Input Player 1 Name</h3>
         <input
           type="text"
           id="playerNameInput"
           placeholder="Ketik nama di sini..."
+          autocomplete="off"
         />
         <button onclick="onSubmitName()">Submit Nama</button>
       </div>
 
       <div id="panel-countdown" class="panel">
         <h3>Game Dimulai Dalam...</h3>
-        <h1 id="countdownText" style="font-size: 64px; color: yellow">3</h1>
+        <h1
+          id="countdownText"
+          style="font-size: 80px; color: #ffeb3b; margin: 20px 0"
+        >
+          3
+        </h1>
       </div>
 
       <div id="panel-game" class="panel">
-        <h3 id="turnIndicator" style="color: yellow">Menunggu Giliran...</h3>
+        <h3 id="turnIndicator" style="color: #ffeb3b">Menunggu Giliran...</h3>
         <div id="miniGrid" class="grid-container">
-          <button id="cell-0" onclick="sendGrid(0)">-</button>
-          <button id="cell-1" onclick="sendGrid(1)">-</button>
-          <button id="cell-2" onclick="sendGrid(2)">-</button>
-          <button id="cell-3" onclick="sendGrid(3)">-</button>
-          <button id="cell-4" onclick="sendGrid(4)">-</button>
-          <button id="cell-5" onclick="sendGrid(5)">-</button>
-          <button id="cell-6" onclick="sendGrid(6)">-</button>
-          <button id="cell-7" onclick="sendGrid(7)">-</button>
-          <button id="cell-8" onclick="sendGrid(8)">-</button>
+          <button id="cell-0" onclick="sendGrid(0)"></button>
+          <button id="cell-1" onclick="sendGrid(1)"></button>
+          <button id="cell-2" onclick="sendGrid(2)"></button>
+          <button id="cell-3" onclick="sendGrid(3)"></button>
+          <button id="cell-4" onclick="sendGrid(4)"></button>
+          <button id="cell-5" onclick="sendGrid(5)"></button>
+          <button id="cell-6" onclick="sendGrid(6)"></button>
+          <button id="cell-7" onclick="sendGrid(7)"></button>
+          <button id="cell-8" onclick="sendGrid(8)"></button>
         </div>
       </div>
     </div>
 
     <script>
       const socket = io();
-
-      // Variabel untuk menyimpan state permainan di sisi tablet
-      let currentMode = 0; // 0 = 1P, 1 = 2P
-      let nameStage = 1; // Sedang input nama P1 atau P2?
+      let currentMode = 0;
+      let nameStage = 1;
 
       socket.on("connect", () => {
         console.log("Terhubung ke Server!");
       });
 
-      // ==========================================
-      // FUNGSI NAVIGASI PANEL (UI FLOW)
-      // ==========================================
       function showPanel(panelId) {
-        // Sembunyikan semua panel
         const panels = document.querySelectorAll(".panel");
         panels.forEach((p) => p.classList.remove("active"));
-
-        // Tampilkan panel yang dituju
         document.getElementById(panelId).classList.add("active");
       }
 
-      // ==========================================
-      // LOGIKA ALUR PERMAINAN
-      // ==========================================
-
-      // Step 1: Mulai
       function onStartGame() {
         socket.emit("startGame");
-        showPanel("panel-mode"); // Lanjut ke pilih mode
+        showPanel("panel-mode");
       }
 
-      // Step 2: Pilih Mode
       function onSelectMode(mode) {
         currentMode = mode;
         socket.emit("selectMode", mode);
-
-        // Reset stage nama ke P1 setiap kali pilih mode
         nameStage = 1;
         document.getElementById("nameTitle").innerText = "Input Player 1 Name";
         document.getElementById("playerNameInput").value = "";
-
-        showPanel("panel-name"); // Lanjut ke input nama
+        showPanel("panel-name");
       }
 
-      // Step 3: Submit Nama
       function onSubmitName() {
         const nameInput = document.getElementById("playerNameInput");
         const nameValue = nameInput.value.trim();
 
         if (nameValue === "") {
-          alert("Nama tidak boleh kosong!");
+          Swal.fire({
+            icon: "warning",
+            title: "Tunggu dulu!",
+            text: "Nama tidak boleh kosong!",
+            background: "#333",
+            color: "#fff",
+            confirmButtonColor: "#ff9800",
+          });
           return;
         }
 
-        // Kirim nama ke Node.js
         socket.emit("submitName", { player: nameStage, name: nameValue });
 
-        // Tentukan alur selanjutnya
         if (currentMode === 1 && nameStage === 1) {
-          // Jika mode 2P dan baru selesai input P1, lanjut minta P2
           nameStage = 2;
           document.getElementById("nameTitle").innerText =
             "Input Player 2 Name";
           nameInput.value = "";
           nameInput.focus();
         } else {
-          // Jika mode 1P (sudah P1), ATAU mode 2P (sudah P2)
           startCountdown();
         }
       }
 
-      // Step 4: Countdown
       function startCountdown() {
         showPanel("panel-countdown");
         let count = 3;
@@ -218,26 +240,22 @@
             countdownElement.innerText = count;
           } else {
             clearInterval(interval);
-            showPanel("panel-game"); // Lanjut ke Main Game
+            showPanel("panel-game");
           }
-        }, 1000); // Tiap 1 detik
+        }, 1000);
       }
 
-      // Step 5: Main Game Action
       function sendGrid(index) {
         socket.emit("gridClick", index);
       }
 
-      // ==========================================
-      // MENDENGARKAN FEEDBACK DARI UNITY
-      // ==========================================
       socket.on("syncGrid", (data) => {
         const cell = document.getElementById(`cell-${data.index}`);
         if (cell) {
           cell.innerText = data.side;
           cell.style.backgroundColor =
-            data.side === "X" ? "#8BC34A" : "#9C27B0"; // Green/Purple
-          cell.style.pointerEvents = "none"; // Disable klik kalau sudah terisi
+            data.side === "X" ? "#8BC34A" : "#9C27B0";
+          cell.style.pointerEvents = "none";
         }
       });
 
@@ -247,18 +265,26 @@
       });
 
       socket.on("syncGameOver", (data) => {
-        alert(data.winner + " Menang!");
-        // Kamu bisa menambahkan logika reset UI di sini (misal kembali ke Start)
-        setTimeout(() => {
-          resetTabletUI();
-        }, 2000);
+        Swal.fire({
+          title: "Game Over!",
+          text: data.winner,
+          icon: "success",
+          background: "#333",
+          color: "#fff",
+          confirmButtonColor: "#4caf50",
+          confirmButtonText: "Main Lagi",
+          allowOutsideClick: false,
+        }).then((result) => {
+          if (result.isConfirmed) {
+            resetTabletUI();
+          }
+        });
       });
 
       function resetTabletUI() {
-        // Bersihkan grid
         for (let i = 0; i < 9; i++) {
           let cell = document.getElementById(`cell-${i}`);
-          cell.innerText = "-";
+          cell.innerText = "";
           cell.style.backgroundColor = "#555";
           cell.style.pointerEvents = "auto";
         }
@@ -267,9 +293,6 @@
         showPanel("panel-start");
       }
 
-      // ==========================================
-      // FULLSCREEN
-      // ==========================================
       function toggleFullScreen() {
         if (
           !document.fullscreenElement &&
