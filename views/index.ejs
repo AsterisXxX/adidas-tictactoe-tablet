@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Game Controller</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #222;
+        color: #fff;
+        text-align: center;
+        padding: 20px;
+        margin: 0;
+      }
+      .container {
+        max-width: 600px;
+        margin: auto;
+        background: #333;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+        position: relative; /* Untuk positioning tombol fullscreen jika mau di pojok */
+      }
+      button {
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        padding: 15px 32px;
+        text-align: center;
+        font-size: 16px;
+        margin: 10px 0;
+        cursor: pointer;
+        width: 100%;
+        border-radius: 5px;
+      }
+      button:active {
+        background-color: #45a049;
+      }
+      input,
+      select {
+        width: calc(100% - 22px);
+        padding: 10px;
+        margin: 10px 0;
+        font-size: 16px;
+        border-radius: 5px;
+        border: none;
+      }
+      hr {
+        border: 1px solid #444;
+        margin: 20px 0;
+      }
+
+      .btn-fullscreen {
+        background-color: #555;
+        margin-bottom: 20px;
+      }
+      .btn-fullscreen:active {
+        background-color: #444;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <button class="btn-fullscreen" onclick="toggleFullScreen()">
+        ⛶ Toggle Fullscreen
+      </button>
+
+      <h2>Game Controller</h2>
+
+      <button onclick="sendTrigger('/api/start')">▶ Start Game</button>
+
+      <hr />
+
+      <select id="modeSelect">
+        <option value="0">1 Player (vs Bot)</option>
+        <option value="1">2 Players</option>
+      </select>
+      <button onclick="setMode()">Select Mode</button>
+
+      <hr />
+
+      <input type="text" id="p1Name" placeholder="Player 1 Name (Mode 1P/2P)" />
+      <button onclick="setName(1, 'p1Name')">Submit P1 Name</button>
+
+      <input
+        type="text"
+        id="p2Name"
+        placeholder="Player 2 Name (Mode 2P only)"
+      />
+      <button onclick="setName(2, 'p2Name')">Submit P2 Name</button>
+
+      <hr />
+
+      <button
+        onclick="sendTrigger('/api/leaderboard')"
+        style="background-color: #2196f3"
+      >
+        🏆 Open Leaderboard
+      </button>
+      <button
+        onclick="sendTrigger('/api/ads')"
+        style="background-color: #f44336"
+      >
+        📺 Switch to Looping Ads
+      </button>
+    </div>
+
+    <script>
+      // Fungsi Fullscreen (Mendukung berbagai jenis browser)
+      function toggleFullScreen() {
+        if (
+          !document.fullscreenElement && // API Standar
+          !document.mozFullScreenElement &&
+          !document.webkitFullscreenElement &&
+          !document.msFullscreenElement
+        ) {
+          // Jika belum fullscreen, masuk ke fullscreen
+          if (document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen();
+          } else if (document.documentElement.msRequestFullscreen) {
+            document.documentElement.msRequestFullscreen();
+          } else if (document.documentElement.mozRequestFullScreen) {
+            document.documentElement.mozRequestFullScreen();
+          } else if (document.documentElement.webkitRequestFullscreen) {
+            document.documentElement.webkitRequestFullscreen(
+              Element.ALLOW_KEYBOARD_INPUT,
+            );
+          }
+        } else {
+          // Jika sudah fullscreen, keluar dari fullscreen
+          if (document.exitFullscreen) {
+            document.exitFullscreen();
+          } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+          } else if (document.mozCancelFullScreen) {
+            document.mozCancelFullScreen();
+          } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+          }
+        }
+      }
+
+      // Fungsi umum untuk menembak endpoint REST
+      async function sendTrigger(endpoint, data = {}) {
+        try {
+          const response = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+          });
+          const result = await response.json();
+          console.log(result.message);
+        } catch (error) {
+          console.error("Error:", error);
+          alert("Koneksi ke server PC gagal!");
+        }
+      }
+
+      // Fungsi spesifik untuk Mode
+      function setMode() {
+        const modeValue = parseInt(document.getElementById("modeSelect").value);
+        sendTrigger("/api/mode", { mode: modeValue });
+      }
+
+      // Fungsi spesifik untuk Nama
+      function setName(playerNum, inputId) {
+        const nameValue = document.getElementById(inputId).value;
+        if (nameValue.trim() === "") {
+          alert("Nama tidak boleh kosong!");
+          return;
+        }
+        sendTrigger("/api/name", { player: playerNum, name: nameValue });
+        document.getElementById(inputId).value = ""; // Clear input setelah kirim
+      }
+    </script>
+  </body>
+</html>
