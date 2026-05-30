@@ -21,37 +21,69 @@ app.get("/", (req, res) => {
   res.render("index");
 });
 
+let isGameConnected = false;
+let heartbeatTimeout;
+
+function setGameConnectionState(state) {
+  if (isGameConnected !== state) {
+    isGameConnected = state;
+    console.log(
+      isGameConnected ? "🟢 Unity Game Terhubung!" : "🔴 Unity Game Terputus!",
+    );
+
+    io.emit("gameStateChanged", isGameConnected);
+  }
+}
+
 io.on("connection", (socket) => {
   console.log("Tablet terhubung via WebSocket!");
 
-  socket.on("startGame", () => oscClient.send("/ui/start", 1));
-  socket.on("selectMode", (mode) => oscClient.send("/ui/mode", mode));
-  socket.on("submitName", (data) =>
-    oscClient.send(`/ui/name/${data.player}`, data.name),
-  );
+  socket.emit("gameStateChanged", isGameConnected);
 
-  socket.on("gridClick", (index) => oscClient.send("/game/grid/click", index));
+  const validateGameConnection = () => {
+    if (!isGameConnected) {
+      return false;
+    }
+    return true;
+  };
+
+  socket.on("startGame", () => {
+    if (validateGameConnection()) oscClient.send("/ui/start", 1);
+  });
+  socket.on("selectMode", (mode) => {
+    if (validateGameConnection()) oscClient.send("/ui/mode", mode);
+  });
+  socket.on("submitName", (data) => {
+    if (validateGameConnection())
+      oscClient.send(`/ui/name/${data.player}`, data.name);
+  });
+  socket.on("gridClick", (index) => {
+    if (validateGameConnection()) oscClient.send("/game/grid/click", index);
+  });
 });
 
 oscServer.on("message", (msg) => {
   const [address, ...args] = msg;
 
-  console.log(`[OSC IN] Address: ${address} | Args:`, args);
+  if (address === "/game/ping") {
+    setGameConnectionState(true);
+
+    clearTimeout(heartbeatTimeout);
+
+    heartbeatTimeout = setTimeout(() => {
+      setGameConnectionState(false);
+    }, 3000);
+
+    return;
+  }
 
   if (address === "/game/updateGrid") {
-    console.log(
-      `---> Mengirim ke Tablet: syncGrid (Index: ${args[0]}, Side: ${args[1]})`,
-    );
     io.emit("syncGrid", { index: args[0], side: args[1] });
   }
-
   if (address === "/game/turn") {
-    console.log(`---> Mengirim ke Tablet: syncTurn (Player: ${args[0]})`);
     io.emit("syncTurn", { playerName: args[0] });
   }
-
   if (address === "/game/over") {
-    console.log(`---> Mengirim ke Tablet: syncGameOver (Winner: ${args[0]})`);
     io.emit("syncGameOver", { winner: args[0] });
   }
 });

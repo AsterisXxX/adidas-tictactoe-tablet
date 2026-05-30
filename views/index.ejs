@@ -114,10 +114,31 @@
         background-color: #555;
         border-radius: 12px;
       }
+
+      #connection-status {
+        position: fixed;
+        top: 15px;
+        left: 15px;
+        padding: 10px 15px;
+        border-radius: 8px;
+        background-color: rgba(85, 85, 85, 0.4);
+        font-size: 14px;
+        font-weight: bold;
+        z-index: 9999;
+        backdrop-filter: blur(5px);
+        transition: color 0.3s ease;
+      }
+      .status-online {
+        color: #4caf50;
+      } /* Hijau */
+      .status-offline {
+        color: #f44336;
+      } /* Merah */
     </style>
   </head>
   <body>
     <button class="btn-fullscreen" onclick="toggleFullScreen()">⛶</button>
+    <div id="connection-status" class="status-offline">🔴 Game Offline</div>
     <div class="container">
       <h2>Game Controller</h2>
       <hr style="border: 1px solid #555; margin-bottom: 20px" />
@@ -172,11 +193,29 @@
 
     <script>
       const socket = io();
+      let isGameConnected = false;
       let currentMode = 0;
       let nameStage = 1;
 
+      let movesX = [];
+      let movesO = [];
+
       socket.on("connect", () => {
         console.log("Terhubung ke Server!");
+      });
+
+      socket.on("gameStateChanged", (isConnected) => {
+        const statusEl = document.getElementById("connection-status");
+        isGameConnected = isConnected;
+
+        if (isConnected) {
+          statusEl.innerText = "🟢 Game Online";
+          statusEl.className = "status-online";
+        } else {
+          statusEl.innerText = "🔴 Game Offline";
+          statusEl.className = "status-offline";
+          resetTabletUI();
+        }
       });
 
       function showPanel(panelId) {
@@ -185,12 +224,31 @@
         document.getElementById(panelId).classList.add("active");
       }
 
+      function checkConnection() {
+        if (!isGameConnected) {
+          Swal.fire({
+            icon: "error",
+            title: "Koneksi Terputus!",
+            text: "Game Unity belum terhubung ke Server. Pastikan Game di PC sudah dijalankan.",
+            background: "#333",
+            color: "#fff",
+            confirmButtonColor: "#f44336",
+            confirmButtonText: "Tutup",
+          });
+          return false;
+        }
+        return true;
+      }
+
       function onStartGame() {
-        socket.emit("startGame");
-        showPanel("panel-mode");
+        if (checkConnection()) {
+          socket.emit("startGame");
+          showPanel("panel-mode");
+        }
       }
 
       function onSelectMode(mode) {
+        if (!checkConnection()) return;
         currentMode = mode;
         socket.emit("selectMode", mode);
         nameStage = 1;
@@ -200,6 +258,8 @@
       }
 
       function onSubmitName() {
+        if (!checkConnection()) return;
+
         const nameInput = document.getElementById("playerNameInput");
         const nameValue = nameInput.value.trim();
 
@@ -245,19 +305,53 @@
         }, 1000);
       }
 
-      function sendGrid(index) {
-        socket.emit("gridClick", index);
-      }
-
       socket.on("syncGrid", (data) => {
-        const cell = document.getElementById(`cell-${data.index}`);
-        if (cell) {
-          cell.innerText = data.side;
-          cell.style.backgroundColor =
-            data.side === "X" ? "#8BC34A" : "#9C27B0";
-          cell.style.pointerEvents = "none";
+        const cellIndex = data.index;
+        const side = data.side;
+        const cell = document.getElementById(`cell-${cellIndex}`);
+
+        if (!cell) return;
+
+        if (side === "") {
+          cell.innerText = "";
+          cell.style.backgroundColor = "#555";
+          cell.style.opacity = "1";
+
+          movesX = movesX.filter((i) => i !== cellIndex);
+          movesO = movesO.filter((i) => i !== cellIndex);
+
+          updateFadingVisuals();
+          return;
         }
+
+        cell.innerText = side;
+        cell.style.backgroundColor = side === "X" ? "#8BC34A" : "#9C27B0";
+        cell.style.opacity = "1";
+
+        if (side === "X") {
+          movesX.push(cellIndex);
+        } else if (side === "O") {
+          movesO.push(cellIndex);
+        }
+
+        updateFadingVisuals();
       });
+
+      function updateFadingVisuals() {
+        for (let i = 0; i < 9; i++) {
+          document.getElementById(`cell-${i}`).style.opacity = "1";
+        }
+
+        if (movesX.length === 3) {
+          const oldestMoveX = movesX[0];
+          document.getElementById(`cell-${oldestMoveX}`).style.opacity = "0.3";
+        }
+
+        if (movesO.length === 3) {
+          const oldestMoveO = movesO[0];
+          document.getElementById(`cell-${oldestMoveO}`).style.opacity = "0.3";
+        }
+      }
 
       socket.on("syncTurn", (data) => {
         document.getElementById("turnIndicator").innerText =
@@ -272,7 +366,7 @@
           background: "#333",
           color: "#fff",
           confirmButtonColor: "#4caf50",
-          confirmButtonText: "Main Lagi",
+          confirmButtonText: "Selesai",
           allowOutsideClick: false,
         }).then((result) => {
           if (result.isConfirmed) {
@@ -282,11 +376,14 @@
       });
 
       function resetTabletUI() {
+        movesX = [];
+        movesO = [];
+
         for (let i = 0; i < 9; i++) {
           let cell = document.getElementById(`cell-${i}`);
           cell.innerText = "";
           cell.style.backgroundColor = "#555";
-          cell.style.pointerEvents = "auto";
+          cell.style.opacity = "1";
         }
         document.getElementById("turnIndicator").innerText =
           "Menunggu Giliran...";
