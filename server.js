@@ -24,6 +24,8 @@ app.get("/", (req, res) => {
 let isGameConnected = false;
 let heartbeatTimeout;
 
+let activeTabletSocketId = null;
+
 function setGameConnectionState(state) {
   if (isGameConnected !== state) {
     isGameConnected = state;
@@ -36,7 +38,21 @@ function setGameConnectionState(state) {
 }
 
 io.on("connection", (socket) => {
-  console.log("Tablet terhubung via WebSocket!");
+  if (activeTabletSocketId !== null) {
+    console.log(
+      `[BLOCKED] Perangkat asing mencoba masuk (${socket.id}). Koneksi ditolak.`,
+    );
+    socket.emit("gameOfflineError", {
+      message: "Sudah ada tablet yang mengontrol game ini.",
+    });
+    socket.disconnect(true);
+    return;
+  }
+
+  activeTabletSocketId = socket.id;
+  console.log(`📱 Tablet SAH terhubung via WebSocket! (ID: ${socket.id})`);
+
+  oscClient.send("/ui/connection", 1);
 
   socket.emit("gameStateChanged", isGameConnected);
 
@@ -57,13 +73,29 @@ io.on("connection", (socket) => {
     if (validateGameConnection())
       oscClient.send(`/ui/name/${data.player}`, data.name);
   });
-  socket.on("gridClick", (index) => {
-    if (validateGameConnection()) oscClient.send("/game/grid/click", index);
+
+  socket.on("disconnect", () => {
+    if (activeTabletSocketId === socket.id) {
+      console.log(
+        `📱 Tablet terputus! (ID: ${socket.id}) - Slot kontroler kosong.`,
+      );
+      activeTabletSocketId = null;
+
+      oscClient.send("/ui/connection", 0);
+    }
   });
 });
 
 oscServer.on("message", (msg) => {
   const [address, ...args] = msg;
+
+  if (address === "/game/interactable") {
+    const isInteractable = args[0] === 1;
+    console.log(
+      `---> Mengirim ke Tablet: syncInteractable (${isInteractable})`,
+    );
+    io.emit("syncInteractable", isInteractable);
+  }
 
   if (address === "/game/ping") {
     setGameConnectionState(true);
