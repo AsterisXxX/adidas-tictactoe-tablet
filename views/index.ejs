@@ -551,10 +551,6 @@
           confirmButtonColor: "#4caf50",
           confirmButtonText: "Selesai",
           allowOutsideClick: false,
-        }).then((result) => {
-          if (result.isConfirmed) {
-            resetTabletUI();
-          }
         });
       });
       socket.on("backtohome", () => {
