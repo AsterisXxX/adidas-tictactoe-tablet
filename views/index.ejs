@@ -21,7 +21,6 @@
         min-height: 100vh;
         overflow: hidden;
       }
-
       .container {
         width: 90%;
         max-width: 600px;
@@ -31,7 +30,6 @@
         box-shadow: 0 8px 20px rgba(0, 0, 0, 0.7);
         position: relative;
       }
-
       #interaction-blocker {
         position: absolute;
         top: 0;
@@ -77,12 +75,18 @@
         border-radius: 8px;
         transition:
           transform 0.1s,
-          background-color 0.2s;
+          background-color 0.2s,
+          opacity 0.2s;
       }
-
-      button:active {
+      button:active:not(:disabled) {
         background-color: #45a049;
         transform: scale(0.98);
+      }
+      button:disabled {
+        background-color: #888 !important;
+        color: #ccc;
+        cursor: not-allowed;
+        opacity: 0.6;
       }
 
       .btn-fullscreen {
@@ -98,11 +102,6 @@
         z-index: 9999;
         backdrop-filter: blur(5px);
       }
-      .btn-fullscreen:active {
-        background-color: rgba(85, 85, 85, 0.8);
-      }
-
-      /* --- STYLE TOMBOL RESET --- */
       .btn-reset {
         position: fixed;
         bottom: 15px;
@@ -118,12 +117,8 @@
         z-index: 9999;
         box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
       }
-      .btn-reset:active {
-        background-color: #d32f2f;
-      }
-      /* -------------------------- */
 
-      input {
+      input[type="text"] {
         width: calc(100% - 30px);
         padding: 15px;
         margin: 15px 0;
@@ -143,7 +138,6 @@
         display: block;
         animation: fadeIn 0.3s ease-in-out;
       }
-
       @keyframes fadeIn {
         from {
           opacity: 0;
@@ -161,7 +155,6 @@
         gap: 8px;
         margin-top: 20px;
       }
-
       .grid-container div {
         height: 100px;
         font-size: 40px;
@@ -187,36 +180,55 @@
         backdrop-filter: blur(5px);
         transition: color 0.3s ease;
       }
-
       .status-online {
         color: #4caf50;
       }
       .status-offline {
         color: #f44336;
       }
+
+      .btn-upload {
+        background-color: #9c27b0;
+        margin-top: 20px;
+      }
     </style>
   </head>
   <body>
     <button class="btn-fullscreen" onclick="toggleFullScreen()">⛶</button>
     <div id="connection-status" class="status-offline">🔴 Game Offline</div>
-
     <button class="btn-reset" onclick="confirmReset()">🔄 Reset</button>
 
     <div class="container">
       <div id="interaction-blocker">
         <div class="loading-text">Tunggu Sebentar...</div>
       </div>
+
       <h2>Game Controller</h2>
       <hr style="border: 1px solid #555; margin-bottom: 20px" />
+
       <div id="panel-start" class="panel active">
-        <button onclick="onStartGame()">▶️ Start Game</button>
-        <button onclick="onShowLeaderboard()" style="background-color: #ff9800">
+        <button id="btnStart" onclick="onStartGame()">▶️ Start Game</button>
+        <button
+          id="btnLeaderboard"
+          onclick="onShowLeaderboard()"
+          style="background-color: #ff9800"
+        >
           📃 Show Leaderboard
         </button>
-        <button onclick="onSwitchLoop()" style="background-color: #2196f3">
-          🎬 Switch to Loop
+        <button
+          id="btnLoop"
+          onclick="onToggleLoop()"
+          style="background-color: #2196f3"
+        >
+          🎬 Switch to Loop (OFF)
+        </button>
+
+        <hr style="border: 1px dashed #555; margin: 20px 0" />
+        <button id="btnUpload" class="btn-upload" onclick="openUploadModal()">
+          📤 Upload New Loop
         </button>
       </div>
+
       <div id="panel-mode" class="panel">
         <h3>Pilih Mode Bermain</h3>
         <button onclick="onSelectMode(0)" style="background-color: #2196f3">
@@ -238,7 +250,6 @@
         />
         <button onclick="onSubmitName()">Submit Nama</button>
       </div>
-
       <div id="panel-countdown" class="panel">
         <h3>Game Dimulai Dalam...</h3>
         <h1
@@ -248,19 +259,18 @@
           3
         </h1>
       </div>
-
       <div id="panel-game" class="panel">
         <h3 id="turnIndicator" style="color: #ffeb3b">Menunggu Giliran...</h3>
         <div id="miniGrid" class="grid-container">
-          <div id="cell-0" onclick="sendGrid(0)"></div>
-          <div id="cell-1" onclick="sendGrid(1)"></div>
-          <div id="cell-2" onclick="sendGrid(2)"></div>
-          <div id="cell-3" onclick="sendGrid(3)"></div>
-          <div id="cell-4" onclick="sendGrid(4)"></div>
-          <div id="cell-5" onclick="sendGrid(5)"></div>
-          <div id="cell-6" onclick="sendGrid(6)"></div>
-          <div id="cell-7" onclick="sendGrid(7)"></div>
-          <div id="cell-8" onclick="sendGrid(8)"></div>
+          <div id="cell-0"></div>
+          <div id="cell-1"></div>
+          <div id="cell-2"></div>
+          <div id="cell-3"></div>
+          <div id="cell-4"></div>
+          <div id="cell-5"></div>
+          <div id="cell-6"></div>
+          <div id="cell-7"></div>
+          <div id="cell-8"></div>
         </div>
       </div>
     </div>
@@ -270,9 +280,9 @@
       let isGameConnected = false;
       let currentMode = 0;
       let nameStage = 1;
-
       let movesX = [];
       let movesO = [];
+      let isAdsRunning = false;
 
       socket.on("connect", () => {
         console.log("Terhubung ke Server!");
@@ -281,7 +291,6 @@
       socket.on("gameStateChanged", (isConnected) => {
         const statusEl = document.getElementById("connection-status");
         isGameConnected = isConnected;
-
         if (isConnected) {
           statusEl.innerText = "🟢 Game Online";
           statusEl.className = "status-online";
@@ -291,6 +300,90 @@
           resetTabletUI();
         }
       });
+
+      socket.on("syncLoopState", (isLooping) => {
+        isAdsRunning = isLooping;
+        const btnLoop = document.getElementById("btnLoop");
+        const btnStart = document.getElementById("btnStart");
+        const btnLeaderboard = document.getElementById("btnLeaderboard");
+
+        if (isAdsRunning) {
+          btnLoop.innerText = "⏹️ Switch to Menu";
+          btnLoop.style.backgroundColor = "#f44336";
+          btnStart.disabled = true;
+          btnLeaderboard.disabled = true;
+        } else {
+          btnLoop.innerText = "🎬 Switch to Loop";
+          btnLoop.style.backgroundColor = "#2196f3";
+          btnStart.disabled = false;
+          btnLeaderboard.disabled = false;
+        }
+      });
+
+      function onToggleLoop() {
+        if (!checkConnection()) return;
+        socket.emit("toggleLoop");
+      }
+
+      function openUploadModal() {
+        if (isAdsRunning) {
+          Swal.fire({
+            icon: "warning",
+            title: "Iklan Sedang Berjalan",
+            text: "Matikan mode iklan terlebih dahulu sebelum mengunggah video baru.",
+            background: "#333",
+            color: "#fff",
+          });
+          return;
+        }
+
+        Swal.fire({
+          title: "Upload Video Iklan",
+          html: `<input type="file" id="videoFileInput" accept="video/mp4" style="width: 80%; background: #222; color: white; padding: 10px; border-radius: 5px;">`,
+          showCancelButton: true,
+          confirmButtonText: "Upload",
+          showLoaderOnConfirm: true,
+          allowOutsideClick: () => !Swal.isLoading(),
+          background: "#333",
+          color: "#fff",
+          preConfirm: () => {
+            const fileInput = document.getElementById("videoFileInput");
+            if (!fileInput.files.length) {
+              Swal.showValidationMessage(
+                "Silakan pilih file video MP4 terlebih dahulu",
+              );
+              return false;
+            }
+
+            const formData = new FormData();
+            formData.append("videoFile", fileInput.files[0]);
+
+            return fetch("/upload", {
+              method: "POST",
+              body: formData,
+            })
+              .then((response) => {
+                if (!response.ok) {
+                  throw new Error(response.statusText);
+                }
+                return response.json();
+              })
+              .catch((error) => {
+                Swal.showValidationMessage(`Gagal mengunggah: ${error}`);
+              });
+          },
+        }).then((result) => {
+          if (result.isConfirmed) {
+            Swal.fire({
+              icon: "success",
+              title: "Berhasil!",
+              text: "Video telah disimpan di folder server.",
+              background: "#333",
+              color: "#fff",
+            });
+          }
+        });
+      }
 
       function showPanel(panelId) {
         const panels = document.querySelectorAll(".panel");
@@ -312,7 +405,7 @@
           Swal.fire({
             icon: "error",
             title: "Koneksi Terputus!",
-            text: "Game Unity belum terhubung ke Server. Pastikan Game di PC sudah dijalankan.",
+            text: "Game Unity belum terhubung ke Server.",
             background: "#333",
             color: "#fff",
             confirmButtonColor: "#f44336",
@@ -330,6 +423,10 @@
         }
       }
 
+      function onShowLeaderboard() {
+        if (checkConnection()) socket.emit("showLeaderboard");
+      }
+
       function onSelectMode(mode) {
         if (!checkConnection()) return;
         currentMode = mode;
@@ -342,7 +439,6 @@
 
       function onSubmitName() {
         if (!checkConnection()) return;
-
         const nameInput = document.getElementById("playerNameInput");
         const nameValue = nameInput.value.trim();
 
@@ -392,10 +488,9 @@
 
       function confirmReset() {
         if (!checkConnection()) return;
-
         Swal.fire({
           title: "Reset Permainan?",
-          text: "Semua progres akan hilang dan kembali ke Menu Utama.",
+          text: "Semua progres akan hilang.",
           icon: "warning",
           showCancelButton: true,
           background: "#333",
@@ -404,45 +499,29 @@
           cancelButtonColor: "#555",
           confirmButtonText: "Ya, Reset!",
           cancelButtonText: "Batal",
-        }).then((result) => {
-          if (result.isConfirmed) {
-            socket.emit("resetGame");
-            resetTabletUI();
-            document.getElementById("interaction-blocker").style.display =
-              "none";
-          }
         });
       }
 
       socket.on("syncGrid", (data) => {
-        const cellIndex = data.index;
-        const side = data.side;
-        const cell = document.getElementById(`cell-${cellIndex}`);
-
+        const cell = document.getElementById(`cell-${data.index}`);
         if (!cell) return;
-
-        if (side === "") {
+        if (data.side === "") {
           cell.innerText = "";
           cell.style.backgroundColor = "#555";
           cell.style.opacity = "1";
-
-          movesX = movesX.filter((i) => i !== cellIndex);
-          movesO = movesO.filter((i) => i !== cellIndex);
-
+          movesX = movesX.filter((i) => i !== data.index);
+          movesO = movesO.filter((i) => i !== data.index);
           updateFadingVisuals();
           return;
         }
-
-        cell.innerText = side;
-        cell.style.backgroundColor = side === "X" ? "#8BC34A" : "#9C27B0";
+        cell.innerText = data.side;
+        cell.style.backgroundColor = data.side === "X" ? "#8BC34A" : "#9C27B0";
         cell.style.opacity = "1";
-
-        if (side === "X") {
-          movesX.push(cellIndex);
-        } else if (side === "O") {
-          movesO.push(cellIndex);
+        if (data.side === "X") {
+          movesX.push(data.index);
+        } else if (data.side === "O") {
+          movesO.push(data.index);
         }
-
         updateFadingVisuals();
       });
 
@@ -450,15 +529,11 @@
         for (let i = 0; i < 9; i++) {
           document.getElementById(`cell-${i}`).style.opacity = "1";
         }
-
         if (movesX.length === 3) {
-          const oldestMoveX = movesX[0];
-          document.getElementById(`cell-${oldestMoveX}`).style.opacity = "0.3";
+          document.getElementById(`cell-${movesX[0]}`).style.opacity = "0.3";
         }
-
         if (movesO.length === 3) {
-          const oldestMoveO = movesO[0];
-          document.getElementById(`cell-${oldestMoveO}`).style.opacity = "0.3";
+          document.getElementById(`cell-${movesO[0]}`).style.opacity = "0.3";
         }
       }
 
@@ -466,7 +541,6 @@
         document.getElementById("turnIndicator").innerText =
           "Giliran: " + data.playerName;
       });
-
       socket.on("syncGameOver", (data) => {
         Swal.fire({
           title: "Game Over!",
@@ -477,13 +551,15 @@
           confirmButtonColor: "#4caf50",
           confirmButtonText: "Selesai",
           allowOutsideClick: false,
+        }).then((result) => {
+          if (result.isConfirmed) {
+            resetTabletUI();
+          }
         });
       });
-
       socket.on("backtohome", () => {
         resetTabletUI();
       });
-
       socket.on("gameOfflineError", () => {
         Swal.fire({
           icon: "error",
@@ -499,7 +575,6 @@
       function resetTabletUI() {
         movesX = [];
         movesO = [];
-
         for (let i = 0; i < 9; i++) {
           let cell = document.getElementById(`cell-${i}`);
           cell.innerText = "";
@@ -509,14 +584,6 @@
         document.getElementById("turnIndicator").innerText =
           "Menunggu Giliran...";
         showPanel("panel-start");
-      }
-
-      function onShowLeaderboard() {
-        socket.emit("showLeaderboard");
-      }
-
-      function onSwitchLoop() {
-        socket.emit("switchLoop");
       }
 
       function toggleFullScreen() {
