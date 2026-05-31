@@ -102,6 +102,27 @@
         background-color: rgba(85, 85, 85, 0.8);
       }
 
+      /* --- STYLE TOMBOL RESET --- */
+      .btn-reset {
+        position: fixed;
+        bottom: 15px;
+        right: 15px;
+        width: auto;
+        padding: 10px 20px;
+        background-color: #f44336;
+        color: white;
+        font-size: 16px;
+        font-weight: bold;
+        border-radius: 8px;
+        margin: 0;
+        z-index: 9999;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+      }
+      .btn-reset:active {
+        background-color: #d32f2f;
+      }
+      /* -------------------------- */
+
       input {
         width: calc(100% - 30px);
         padding: 15px;
@@ -170,7 +191,6 @@
       .status-online {
         color: #4caf50;
       }
-
       .status-offline {
         color: #f44336;
       }
@@ -179,6 +199,9 @@
   <body>
     <button class="btn-fullscreen" onclick="toggleFullScreen()">⛶</button>
     <div id="connection-status" class="status-offline">🔴 Game Offline</div>
+
+    <button class="btn-reset" onclick="confirmReset()">🔄 Reset</button>
+
     <div class="container">
       <div id="interaction-blocker">
         <div class="loading-text">Tunggu Sebentar...</div>
@@ -186,7 +209,13 @@
       <h2>Game Controller</h2>
       <hr style="border: 1px solid #555; margin-bottom: 20px" />
       <div id="panel-start" class="panel active">
-        <button onclick="onStartGame()">▶ Start Game</button>
+        <button onclick="onStartGame()">▶️ Start Game</button>
+        <button onclick="onShowLeaderboard()" style="background-color: #ff9800">
+          📃 Show Leaderboard
+        </button>
+        <button onclick="onSwitchLoop()" style="background-color: #2196f3">
+          🎬 Switch to Loop
+        </button>
       </div>
       <div id="panel-mode" class="panel">
         <h3>Pilih Mode Bermain</h3>
@@ -338,7 +367,9 @@
           nameInput.value = "";
           nameInput.focus();
         } else {
-          startCountdown();
+          setTimeout(() => {
+            startCountdown();
+          }, 2000);
         }
       }
 
@@ -357,6 +388,30 @@
             showPanel("panel-game");
           }
         }, 1000);
+      }
+
+      function confirmReset() {
+        if (!checkConnection()) return;
+
+        Swal.fire({
+          title: "Reset Permainan?",
+          text: "Semua progres akan hilang dan kembali ke Menu Utama.",
+          icon: "warning",
+          showCancelButton: true,
+          background: "#333",
+          color: "#fff",
+          confirmButtonColor: "#f44336",
+          cancelButtonColor: "#555",
+          confirmButtonText: "Ya, Reset!",
+          cancelButtonText: "Batal",
+        }).then((result) => {
+          if (result.isConfirmed) {
+            socket.emit("resetGame");
+            resetTabletUI();
+            document.getElementById("interaction-blocker").style.display =
+              "none";
+          }
+        });
       }
 
       socket.on("syncGrid", (data) => {
@@ -422,11 +477,11 @@
           confirmButtonColor: "#4caf50",
           confirmButtonText: "Selesai",
           allowOutsideClick: false,
-        }).then((result) => {
-          if (result.isConfirmed) {
-            resetTabletUI();
-          }
         });
+      });
+
+      socket.on("backtohome", () => {
+        resetTabletUI();
       });
 
       socket.on("gameOfflineError", () => {
@@ -454,6 +509,14 @@
         document.getElementById("turnIndicator").innerText =
           "Menunggu Giliran...";
         showPanel("panel-start");
+      }
+
+      function onShowLeaderboard() {
+        socket.emit("showLeaderboard");
+      }
+
+      function onSwitchLoop() {
+        socket.emit("switchLoop");
       }
 
       function toggleFullScreen() {

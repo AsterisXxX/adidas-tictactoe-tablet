@@ -73,6 +73,15 @@ io.on("connection", (socket) => {
     if (validateGameConnection())
       oscClient.send(`/ui/name/${data.player}`, data.name);
   });
+  socket.on("resetGame", () => {
+    if (validateGameConnection()) oscClient.send("/ui/reset", 1);
+  });
+  socket.on("showLeaderboard", () => {
+    if (validateGameConnection()) oscClient.send("/ui/showleaderboard", 1);
+  });
+  socket.on("switchLoop", () => {
+    if (validateGameConnection()) oscClient.send("/ui/switchloop", 1);
+  });
 
   socket.on("disconnect", () => {
     if (activeTabletSocketId === socket.id) {
@@ -100,6 +109,12 @@ oscServer.on("message", (msg) => {
   if (address === "/game/ping") {
     setGameConnectionState(true);
 
+    if (activeTabletSocketId != null) {
+      oscClient.send("/ui/connection", 1);
+    } else {
+      oscClient.send("/ui/connection", 0);
+    }
+
     clearTimeout(heartbeatTimeout);
 
     heartbeatTimeout = setTimeout(() => {
@@ -117,6 +132,9 @@ oscServer.on("message", (msg) => {
   }
   if (address === "/game/over") {
     io.emit("syncGameOver", { winner: args[0] });
+  }
+  if (address === "/game/mainmenu") {
+    io.emit("backtohome");
   }
 });
 
