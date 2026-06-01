@@ -122,6 +122,17 @@ io.on("connection", (socket) => {
     if (validateGameConnection()) oscClient.send("/ui/showleaderboard", 1);
   });
 
+  socket.on("switchLoop", () => {
+    if (validateGameConnection()) oscClient.send("/ui/switchloop", 1);
+  });
+
+  socket.on("changeVolume", (volumeValue) => {
+    if (validateGameConnection()) {
+      let normalizedVolume = volumeValue / 100.0;
+      oscClient.send("/ui/volume", normalizedVolume);
+    }
+  });
+
   socket.on("toggleLoop", () => {
     if (validateGameConnection()) {
       isLoopingAdsActive = !isLoopingAdsActive;

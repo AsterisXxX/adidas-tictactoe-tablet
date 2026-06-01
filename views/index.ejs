@@ -127,13 +127,36 @@
         border: none;
         text-align: center;
       }
-      input:focus {
+
+      input[type="text"]:focus {
         outline: 2px solid #4caf50;
+      }
+
+      input[type="range"] {
+        -webkit-appearance: none;
+        width: 100%;
+        background: #555;
+        height: 8px;
+        border-radius: 5px;
+        outline: none;
+        margin: 15px 0;
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 25px;
+        height: 25px;
+        border-radius: 50%;
+        background: #4caf50;
+        cursor: pointer;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
       }
 
       .panel {
         display: none;
       }
+
       .panel.active {
         display: block;
         animation: fadeIn 0.3s ease-in-out;
@@ -227,6 +250,21 @@
         <button id="btnUpload" class="btn-upload" onclick="openUploadModal()">
           📤 Upload New Loop
         </button>
+        <div style="margin-top: 25px; text-align: left; padding: 0 10px">
+          <label
+            for="volumeSlider"
+            style="font-weight: bold; font-size: 14px; color: #ccc"
+            >🔊 Volume Game & Iklan</label
+          >
+          <input
+            type="range"
+            id="volumeSlider"
+            min="0"
+            max="100"
+            value="100"
+            oninput="onVolumeChange(this.value)"
+          />
+        </div>
       </div>
 
       <div id="panel-mode" class="panel">
@@ -383,6 +421,11 @@
             });
           }
         });
+      }
+
+      function onVolumeChange(value) {
+        if (!checkConnection()) return;
+        socket.emit("changeVolume", value);
       }
 
       function showPanel(panelId) {
