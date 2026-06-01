@@ -499,6 +499,13 @@
           cancelButtonColor: "#555",
           confirmButtonText: "Ya, Reset!",
           cancelButtonText: "Batal",
+        }).then((result) => {
+          if (result.isConfirmed) {
+            socket.emit("resetGame");
+            resetTabletUI();
+            document.getElementById("interaction-blocker").style.display =
+              "none";
+          }
         });
       }
 
